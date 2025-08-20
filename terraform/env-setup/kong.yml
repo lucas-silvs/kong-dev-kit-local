@@ -1,0 +1,11 @@
+_format_version: "2.1"
+services:
+  - name: example-service
+    url: http://example.com
+    routes:
+      - name: example-route
+        paths:
+          - /example
+        plugins:
+          - name: my-plugin
+            
