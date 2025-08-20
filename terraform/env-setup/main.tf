@@ -85,13 +85,14 @@ resource "docker_container" "kong" {
     "KONG_PROXY_ERROR_LOG=/dev/stderr",
     "KONG_ADMIN_ERROR_LOG=/dev/stderr",
     "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl",
-    "KONG_PLUGINS=my-plugin",
+    # incluir o nome do plugin na lista a abaixo para caso surgir novas implementações
+    "KONG_PLUGINS=my-plugin,rate-limiter", 
   ]
   
   // Mound plugin code
   volumes {
-    host_path      = "/${abspath(path.module)}/../../kong/plugins/my-plugin"
-    container_path = "/usr/local/share/lua/5.1/kong/plugins/my-plugin"
+    host_path      = "/${abspath(path.module)}/../../kong/plugins"
+    container_path = "/usr/local/share/lua/5.1/kong/plugins"
   }
   
   // Mount initialization script

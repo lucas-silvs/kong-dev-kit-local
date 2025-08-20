@@ -1,43 +1,35 @@
+# Ambiente de Desenvolvimento de Plugins Kong
 
-# Kong Plugin Development Environment
+Este repositório fornece uma maneira rápida e fácil para desenvolvedores configurarem e testarem seus próprios plugins Kong usando Terraform e Docker.
 
-This repository provides a quick and easy way for developers to set up and test their own Kong plugins using Terraform and Docker.
+## Pré-requisitos
 
-## Prerequisites
-
-Make sure you have the following installed on your machine:
+Certifique-se de ter os seguintes itens instalados em sua máquina:
 
 - [Terraform](https://www.terraform.io/downloads.html) (>= 0.12)
 - [Docker](https://docs.docker.com/get-docker/)
-- [Lua](https://www.lua.org/download.html) (or ``brew install lua``)
+- [Lua](https://www.lua.org/download.html) (ou `brew install lua`)
 
-## Getting Started
+## Primeiros Passos
 
-### 1. Clone the Repository
+### 2. Inicializar e Aplicar a Configuração do Terraform
 
-```sh
-git clone https://github.com/yourusername/kong-plugin-playground.git
-cd kong-plugin-playground/terraform/env-setup
-```
-
-### 2. Initialize and Apply Terraform Configuration
-
-Run the following commands to initialize Terraform and create the necessary resources:
+Execute os seguintes comandos para inicializar o Terraform e criar os recursos necessários:
 
 ```sh
 terraform init
 terraform apply
 ```
 
-This will:
+Isso irá:
 
-1. Pull the latest Kong Docker image.
-2. Create a Docker container for Kong with the necessary ports exposed.
-3. Mount your plugin code and configuration file into the Kong container.
+1. Baixar a imagem Docker mais recente do Kong.
+2. Criar um contêiner Docker para o Kong com as portas necessárias expostas.
+3. Montar seu código de plugin e arquivo de configuração no contêiner Kong.
 
-### 3. Develop Your Plugin
+### 3. Desenvolver Seu Plugin
 
-Your plugin code should be placed in the `kong/plugins/my-plugin` directory. The file structure should look something like this:
+O código do seu plugin deve ser colocado no diretório `kong/plugins/<nome-do-plugin>`. A estrutura de arquivos deve ser algo como:
 
 ```
 
@@ -48,59 +40,53 @@ kong/
            └── schema.lua
 ```
 
-### 4. Configure Kong
+### 5. Iniciar o Kong
 
-The `kong.yml` file should contain your declarative configuration for Kong, including any routes, services, and plugins you want to set up. For example:
-
-```yaml
-_format_version: "2.1"
-services:
-- name: example-service
-  url: http://mockbin.org
-  routes:
-  - name: example-route
-    paths:
-    - /
-
-plugins:
-- name: my-plugin
-  service: example-service
-```
-
-### 5. Start Kong
-
-After placing your plugin code and configuration, run the following command to start Kong with your plugin:
+Após colocar seu código de plugin e configuração, execute o seguinte comando para iniciar o Kong com seu plugin:
 
 ```sh
 terraform apply
 ```
 
-This command will start Kong with the specified configuration in `kong.yml`.
+Este comando iniciará o Kong com a configuração especificada em `kong.yml`.
 
-### 6. Test Your Plugin
+### 6. Testar Seu Plugin
 
-You can test your plugin by sending requests to the configured routes. For example:
+Na URL http://localhost:8001, você pode acessar a interface gráfica do Konga para criar rotas, serviços e testar os novos plugins manualmente.
 
 ```sh
-curl -i http://localhost:8000/
+curl -i http://localhost:8001/
 ```
 
-## Cleaning Up
+## Limpeza
 
-To destroy the created resources, run:
+Para destruir os recursos criados, execute:
 
 ```sh
 terraform destroy
 ```
 
-This will stop and remove the Docker container and clean up any other resources created by Terraform.
+Isso irá parar e remover o contêiner Docker e limpar quaisquer outros recursos criados pelo Terraform.
 
-## Contributing
+## Carregando Novos Plugins
 
-If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
+Para carregar novos plugins, você deve realizar os seguintes passos:
 
-## License
+### Incluir a nova pasta de plugin no diretório de plugins
 
-This project is licensed under the MIT License.
+```
 
----
+kong/
+   └── plugins/
+       └── novo-plugin/
+           ├── handler.lua
+           └── schema.lua
+```
+
+### Recriar contêiner do Kong para carregar novos plugins
+
+Para carregar o novo plugin no contêiner do Kong, será necessário realizar o replace com o Terraform:
+
+```sh
+terraform apply -replace=docker_container.kong
+```
