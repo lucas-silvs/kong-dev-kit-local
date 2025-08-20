@@ -39,6 +39,10 @@ resource "docker_image" "mongo" {
   name = "mongo:4.4"
 }
 
+resource "docker_image" "postgres" {
+  name = "postgres:13"
+}
+
 resource "docker_container" "kong" {
   image = docker_image.kong.image_id
 
@@ -70,14 +74,18 @@ resource "docker_container" "kong" {
   }
 
    env = [
-    "KONG_DATABASE=off",
+    "KONG_DATABASE=postgres",
+    "KONG_PG_HOST=kong-postgres",
+    "KONG_PG_PORT=5432",
+    "KONG_PG_DATABASE=kong",
+    "KONG_PG_USER=kong",
+    "KONG_PG_PASSWORD=kong",
     "KONG_PROXY_ACCESS_LOG=/dev/stdout",
     "KONG_ADMIN_ACCESS_LOG=/dev/stdout",
     "KONG_PROXY_ERROR_LOG=/dev/stderr",
     "KONG_ADMIN_ERROR_LOG=/dev/stderr",
     "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl",
     "KONG_PLUGINS=my-plugin",
-    "KONG_DECLARATIVE_CONFIG=/config/kong.yml",
   ]
   
   // Mound plugin code
@@ -85,14 +93,43 @@ resource "docker_container" "kong" {
     host_path      = "/${abspath(path.module)}/../../kong/plugins/my-plugin"
     container_path = "/usr/local/share/lua/5.1/kong/plugins/my-plugin"
   }
-  // Mount a volume if you have a local declarative configuration file for Kong
-  volumes  {
-    host_path      = "${abspath(path.module)}/kong.yml"
-    container_path = "/config/kong.yml"
+  
+  // Mount initialization script
+  volumes {
+    host_path      = "${abspath(path.module)}/init-kong.sh"
+    container_path = "/init-kong.sh"
   }
 
-  command = ["/bin/sh", "-c", "kong start -c /config/kong.yml"]
+  command = ["/bin/sh", "/init-kong.sh"]
+  
+  restart = "unless-stopped"
+  
+  depends_on = [docker_container.postgres]
     
+}
+
+resource "docker_container" "postgres" {
+  image = docker_image.postgres.image_id
+  
+  name = "kong-postgres"
+  
+  networks_advanced {
+    name = docker_network.kong_network.name
+    aliases = ["kong-postgres", "postgres"]
+  }
+  
+  ports {
+    internal = 5432
+    external = 5432
+  }
+  
+  env = [
+    "POSTGRES_DB=kong",
+    "POSTGRES_USER=kong",
+    "POSTGRES_PASSWORD=kong"
+  ]
+  
+  restart = "unless-stopped"
 }
 
 resource "docker_container" "mongo" {
