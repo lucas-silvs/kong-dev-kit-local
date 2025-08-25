@@ -1,0 +1,121 @@
+version: "3.9"
+
+networks:
+  kong-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+
+services:
+  mockapi:
+    image: node:20-alpine
+    container_name: mockapi
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        npx -y json-server@0.17 --host 0.0.0.0 --port 3001 --watch /data/db.json
+    volumes:
+      - ./mocks:/data:ro # onde ficam db.json e (opcional) routes.json
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    networks:
+      - kong-network # mesmo network dos seus outros serviços
+
+  postgres:
+    image: postgres:13
+    container_name: kong-postgres
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - kong-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: kong-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - kong-network
+
+  mongo:
+    image: mongo:4.4
+    container_name: konga-mongo
+    environment:
+      MONGO_INITDB_DATABASE: konga
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    networks:
+      - kong-network
+
+  kong:
+    image: kong:latest
+    container_name: kong
+    environment:
+      KONG_DATABASE: postgres
+      KONG_LOG_LEVEL: debug
+      KONG_PG_HOST: kong-postgres
+      KONG_PG_PORT: "5432"
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      # Admin em 8001 (http) e 8444 (https)
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      # Plugins custom + nativos do exemplo
+      KONG_PLUGINS: my-plugin,jwt-cache-custom-plugin,response-transformer
+      # Redis para rate-limit/jwt/etc (se configurado)
+      KONG_REDIS_HOST: kong-redis
+      KONG_REDIS_PORT: "6379"
+      KONG_REDIS_DATABASE: "0"
+    depends_on:
+      - postgres
+      - redis
+    command: ["/bin/sh", "/init-kong.sh"]
+    volumes:
+      # ajuste o caminho local dos plugins:
+      - ./kong/plugins:/usr/local/share/lua/5.1/kong/plugins:ro
+      # script de inicialização
+      - ./scripts/init-kong.sh:/init-kong.sh:ro
+    ports:
+      - "8000:8000" # proxy http
+      - "8443:8443" # proxy https
+      - "8001:8001" # admin api http (proteja em prod)
+      - "8444:8444" # admin api https (proteja em prod)
+    restart: unless-stopped
+    networks:
+      - kong-network
+
+  konga:
+    image: pantsel/konga:latest
+    container_name: konga
+    environment:
+      NODE_ENV: production
+      KONGA_HOOK_TIMEOUT: "120000"
+      DB_ADAPTER: mongo
+      DB_URI: mongodb://konga-mongo:27017/konga
+      KONGA_LOG_LEVEL: info
+    depends_on:
+      - kong
+      - mongo
+    ports:
+      - "1337:1337"
+    restart: unless-stopped
+    networks:
+      - kong-network

@@ -1,0 +1,6 @@
+{
+  "auth": {
+    "jwt": "teste",
+    "access_token": "teste access token"
+  }
+}
