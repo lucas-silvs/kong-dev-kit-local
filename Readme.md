@@ -17,8 +17,7 @@ Certifique-se de ter os seguintes itens instalados em sua máquina:
 Execute os seguintes comandos para inicializar o Terraform e criar os recursos necessários:
 
 ```sh
-terraform init
-terraform apply
+docker compose up
 ```
 
 Isso irá:
@@ -45,17 +44,17 @@ kong/
 Após colocar seu código de plugin e configuração, execute o seguinte comando para iniciar o Kong com seu plugin:
 
 ```sh
-terraform apply
+docker compose up -d --force-recreate kong
 ```
 
 Este comando iniciará o Kong com a configuração especificada em `kong.yml`.
 
 ### 6. Testar Seu Plugin
 
-Na URL http://localhost:8001, você pode acessar a interface gráfica do Konga para criar rotas, serviços e testar os novos plugins manualmente.
+Na URL http://localhost:1337, você pode acessar a interface gráfica do Konga para criar rotas, serviços e testar os novos plugins manualmente.
 
 ```sh
-curl -i http://localhost:8001/
+curl -i http://localhost:1337/
 ```
 
 ## Limpeza
@@ -63,7 +62,7 @@ curl -i http://localhost:8001/
 Para destruir os recursos criados, execute:
 
 ```sh
-terraform destroy
+docker compose down
 ```
 
 Isso irá parar e remover o contêiner Docker e limpar quaisquer outros recursos criados pelo Terraform.
@@ -88,5 +87,5 @@ kong/
 Para carregar o novo plugin no contêiner do Kong, será necessário realizar o replace com o Terraform:
 
 ```sh
-terraform apply -replace=docker_container.kong
+docker compose up -d --force-recreate kong
 ```
