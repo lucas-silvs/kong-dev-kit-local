@@ -41,11 +41,32 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kong-redis
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - sh
+      - -lc
+      - |
+        # Passa a senha via arg para não fixar no redis.conf
+        exec redis-server /usr/local/etc/redis/redis.conf \
+          --requirepass "${REDIS_PASSWORD:?defina_no_.env}"
+    environment:
+      # Defina REDIS_PASSWORD no arquivo .env (ex.: REDIS_PASSWORD=superSenha123!)
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     ports:
-      - "6379:6379"
+      - "6379:6379" # TLS (vamos usar TLS na 6379)
     volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./redis/users.acl:/usr/local/etc/redis/users.acl:ro
+      - ./redis/tls:/etc/redis/tls:ro
       - redis_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'redis-cli --tls --cacert /etc/redis/tls/ca.crt -a "$REDIS_PASSWORD" ping | grep PONG',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - kong-network
