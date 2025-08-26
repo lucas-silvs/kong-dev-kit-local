@@ -1,91 +1,100 @@
 # Ambiente de Desenvolvimento de Plugins Kong
 
-Este repositório fornece uma maneira rápida e fácil para desenvolvedores configurarem e testarem seus próprios plugins Kong usando Terraform e Docker.
+Dev-kit para criar, rodar e testar plugins do Kong localmente usando Docker Compose, com Postgres, Redis (TLS), Konga e uma mock API.
 
-## Pré-requisitos
+## Pré‑requisitos
 
-Certifique-se de ter os seguintes itens instalados em sua máquina:
+- Docker e Docker Compose
+- OpenSSL (usado para gerar os certificados TLS do Redis)
+- Opcional: Lua localmente para lint/testes (o runtime roda no container do Kong)
 
-- [Terraform](https://www.terraform.io/downloads.html) (>= 0.12)
-- [Docker](https://docs.docker.com/get-docker/)
-- [Lua](https://www.lua.org/download.html) (ou `brew install lua`)
+## Visão geral dos serviços e portas
 
-## Primeiros Passos
+- Kong Proxy: 8000 (HTTP), 8443 (HTTPS)
+- Kong Admin API: 8001 (HTTP), 8444 (HTTPS)
+- Postgres: 5432
+- Redis (TLS): 6379
+- Konga (UI): 1337
+- Mock API (json-server): 3001
 
-### 2. Inicializar e Aplicar a Configuração do Terraform
+## Passo a passo (primeira execução)
 
-Execute os seguintes comandos para inicializar o Terraform e criar os recursos necessários:
+1) Defina a senha do Redis
+
+Crie um arquivo `.env` na raiz (ou copie de `.env.example`) e defina:
+
+```
+REDIS_PASSWORD=TroqueEstaSenha123!
+```
+
+2) Gere os certificados TLS do Redis
 
 ```sh
-docker compose up
+bash scripts/configure-redis-cert.sh
 ```
 
-Isso irá:
+3) Suba os serviços
 
-1. Baixar a imagem Docker mais recente do Kong.
-2. Criar um contêiner Docker para o Kong com as portas necessárias expostas.
-3. Montar seu código de plugin e arquivo de configuração no contêiner Kong.
-
-### 3. Desenvolver Seu Plugin
-
-O código do seu plugin deve ser colocado no diretório `kong/plugins/<nome-do-plugin>`. A estrutura de arquivos deve ser algo como:
-
+```sh
+docker compose up -d
 ```
 
+O container do Kong roda um script de init que aplica as migrações no Postgres e inicia o Kong automaticamente.
+
+4) Acesse as UIs/serviços
+
+- Konga: http://localhost:1337 (no primeiro acesso, crie o usuário admin e adicione uma conexão apontando para http://kong:8001)
+- Mock API: http://localhost:3001 (dados em `mocks/db.json`)
+
+## Desenvolvendo plugins
+
+Coloque seu código em `kong/plugins/<nome-do-plugin>`:
+
+```
 kong/
-   └── plugins/
-       └── my-plugin/
-           ├── handler.lua
-           └── schema.lua
+    └── plugins/
+            └── my-plugin/
+                    ├── handler.lua
+                    └── schema.lua
 ```
 
-### 5. Iniciar o Kong
+Para que o Kong carregue um plugin custom, inclua o nome dele na variável `KONG_PLUGINS` do `docker-compose.yaml` (separado por vírgula). Ex.: `KONG_PLUGINS: my-plugin,request-transformer,...`.
 
-Após colocar seu código de plugin e configuração, execute o seguinte comando para iniciar o Kong com seu plugin:
+### Ciclo de desenvolvimento
+
+- Alterou somente código Lua do plugin? Faça reload dos workers:
+
+```sh
+docker compose exec kong kong reload
+```
+
+- Adicionou um novo plugin (novo diretório) ou mudou `KONG_PLUGINS`? Recrie o container:
 
 ```sh
 docker compose up -d --force-recreate kong
 ```
 
-Este comando iniciará o Kong com a configuração especificada em `kong.yml`.
+## Testes rápidos
 
-### 6. Testar Seu Plugin
-
-Na URL http://localhost:1337, você pode acessar a interface gráfica do Konga para criar rotas, serviços e testar os novos plugins manualmente.
+- Verifique a Admin API:
 
 ```sh
-curl -i http://localhost:1337/
+curl -fsS http://localhost:8001/ | head -n 5
 ```
+
+- Use o Konga para criar Services/Routes e anexar seus plugins; ou interaja via Admin API na porta 8001.
 
 ## Limpeza
 
-Para destruir os recursos criados, execute:
+Para parar e remover os containers:
 
 ```sh
 docker compose down
 ```
 
-Isso irá parar e remover o contêiner Docker e limpar quaisquer outros recursos criados pelo Terraform.
+## Dicas e solução de problemas
 
-## Carregando Novos Plugins
-
-Para carregar novos plugins, você deve realizar os seguintes passos:
-
-### Incluir a nova pasta de plugin no diretório de plugins
-
-```
-
-kong/
-   └── plugins/
-       └── novo-plugin/
-           ├── handler.lua
-           └── schema.lua
-```
-
-### Recriar contêiner do Kong para carregar novos plugins
-
-Para carregar o novo plugin no contêiner do Kong, será necessário realizar o replace com o Terraform:
-
-```sh
-docker compose up -d --force-recreate kong
-```
+- Redis não sobe ou healthcheck falha: confirme que `.env` existe e `REDIS_PASSWORD` está definido. Os certificados em `redis/tls` devem existir (rode o script de configuração).
+- Porta em uso: ajuste as portas mapeadas em `docker-compose.yaml` ou libere a porta no host.
+- Konga não conecta ao Kong: dentro do Konga use a URL `http://kong:8001` (é o hostname do container do Kong na mesma rede Docker). Do host, a Admin API está em `http://localhost:8001`.
+- Migrações do Kong: são executadas pelo script `scripts/init-kong.sh` ao iniciar o container; verifique os logs do container `kong` em caso de erro.
