@@ -1,6 +1,6 @@
 {
   "auth": {
-    "jwt": "teste",
-    "access_token": "teste access token"
+    "access_token": "at_8b3c6d2e9f1a4b7c8d0e1234567890ab",
+    "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMyIsInNjb3BlIjoicmVhZDpzdHVmZiB3cml0ZTpzdHVmZiIsImV4cCI6MTc1NjE2NjQwMH0.dummy-signature"
   }
 }
