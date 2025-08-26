@@ -1,61 +1,39 @@
 local typedefs = require "kong.db.schema.typedefs"
 
+return {
+    name = "jwt-cache-custom-plugin",
+    fields = {
+        { consumer = typedefs.no_consumer },
+        { protocols = typedefs.protocols_http },
+        {
+            config = {
+                type = "record",
+                fields = {
 
-local PLUGIN_NAME = "jwt-cache-custom-plugin"
 
+                    -- TTL do JWT quando não houver exp conhecido
+                    { disable_encoding = { type = "boolean", required = false, default = false } },
 
-local schema = {
-  name = PLUGIN_NAME,
-  fields = {
-    -- the 'fields' array is the top-level entry with fields defined by Kong
-    { consumer = typedefs.no_consumer },  -- this plugin cannot be configured on a consumer (typical for auth plugins)
-    { protocols = typedefs.protocols_http },
-    { config = {
-        -- The 'config' record is the custom part of the plugin schema
-        type = "record",
-        fields = {
-          -- Redis connection configuration
-          { redis_host = {
-              type = "string",
-              required = true,
-              default = "127.0.0.1" }},
-          { redis_port = {
-              type = "integer",
-              required = true,
-              default = 6379,
-              between = { 1, 65535 } }},
-          { redis_password = {
-              type = "string",
-              required = false }},
-          { redis_database = {
-              type = "integer",
-              required = true,
-              default = 0,
-              between = { 0, 15 } }},
-          { redis_timeout = {
-              type = "number",
-              required = true,
-              default = 2000 }},
-          { redis_keepalive_pool_size = {
-              type = "integer",
-              required = true,
-              default = 10,
-              between = { 1, 100 } }},
-          { redis_keepalive_idle_timeout = {
-              type = "integer",
-              required = true,
-              default = 10000 }},
-          -- JWT token expiration time in Redis (in seconds)
-          { jwt_ttl = {
-              type = "integer",
-              required = true,
-              default = 3600,
-              gt = 0 }},
+                    { jwt_ttl = { type = "integer", required = false, default = 3600 } },
+
+                    -- Redis (básico)
+                    { redis_host = { type = "string", required = true, default = "127.0.0.1" } },
+                    { redis_port = { type = "integer", required = true, default = 6379 } },
+                    { redis_database = { type = "integer", required = false, default = 0 } },
+                    { redis_timeout = { type = "integer", required = false, default = 2000 } },
+                    { redis_keepalive_pool_size = { type = "integer", required = false, default = 100 } },
+                    { redis_keepalive_idle_timeout = { type = "integer", required = false, default = 60000 } },
+
+                    -- autenticação "legacy" (somente senha)
+                    { redis_password = { type = "string", required = false, encrypted = true } },
+
+                    -- Redis ACL (username + password) e TLS
+                    { redis_username = { type = "string", required = false } },
+                    { redis_ssl = { type = "boolean", required = false, default = false } },
+                    { redis_ssl_verify = { type = "boolean", required = false, default = false } },
+                    { redis_server_name = { type = "string", required = false } },
+                },
+            },
         },
-        
-        }
-      },
     },
 }
-
-return schema
