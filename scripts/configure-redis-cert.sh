@@ -1,5 +1,5 @@
-mkdir -p ./../redis/tls
-cd ./../redis/tls
+mkdir -p ./redis/tls
+cd ./redis/tls
 
 # 3.1) CA (autoridade certificadora)
 openssl genrsa -out ca.key 4096
