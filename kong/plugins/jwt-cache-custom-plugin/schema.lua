@@ -23,12 +23,12 @@ return {
                     { redis_timeout = { type = "integer", required = false, default = 2000 } },
                     { redis_keepalive_pool_size = { type = "integer", required = false, default = 100 } },
                     { redis_keepalive_idle_timeout = { type = "integer", required = false, default = 60000 } },
-                    
-                    
+
+
                     -- Redis ACL (username + password) e TLS
-                    { redis_username = { type = "string", required = false } },
+                    { redis_username = { type = "string", required = false, referenceable = true } },
                     -- autenticação "legacy" (somente senha)
-                    { redis_password = { type = "string", required = false, encrypted = true } },
+                    { redis_password = { type = "string", required = false, encrypted = true, referenceable = true } },
 
 
                     { redis_ssl = { type = "boolean", required = false, default = false } },

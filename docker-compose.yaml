@@ -76,7 +76,7 @@ services:
     container_name: kong
     environment:
       KONG_DATABASE: postgres
-      KONG_LOG_LEVEL: error
+      KONG_LOG_LEVEL: debug
       KONG_PG_HOST: kong-postgres
       KONG_PG_PORT: "5432"
       KONG_PG_DATABASE: kong
@@ -94,6 +94,8 @@ services:
       KONG_REDIS_HOST: kong-redis
       KONG_REDIS_PORT: "6379"
       KONG_REDIS_DATABASE: "0"
+      VAULT_KONG_REDIS_CREDENTIALS: '{"username":"app", "password":"App123*"}'
+
     depends_on:
       - postgres
       - redis
