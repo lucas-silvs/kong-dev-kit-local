@@ -1,8 +1,67 @@
 -- kong/plugins/jwt-cache-custom-plugin/redis_kv.lua
 local redis = require "resty.redis"
-local cjson = require "cjson.safe"
+local has_cluster, rediscluster = pcall(require, "resty.rediscluster")
+if not has_cluster then
+    -- algumas distros instalam o módulo como "rediscluster"
+    has_cluster, rediscluster = pcall(require, "rediscluster")
+end
 
 local _M = {}
+
+local function parse_cluster_nodes(conf)
+    local nodes = {}
+    for _, hp in ipairs(conf.redis_cluster_nodes or {}) do
+        local host, port = tostring(hp):match("^%s*([^:]+):(%d+)%s*$")
+        if host and port then
+            nodes[#nodes + 1] = { ip = host, port = tonumber(port) }
+        end
+    end
+    return nodes
+end
+
+local function red_connect_cluster(conf)
+    if not has_cluster then
+        return nil, "kong-redis-cluster (resty.rediscluster) não instalado"
+    end
+
+    local serv_list = parse_cluster_nodes(conf)
+    if #serv_list == 0 then
+        return nil, "redis_cluster_nodes vazio"
+    end
+
+    local params = {
+        -- iguais ao exemplo do README
+        name                    = conf.redis_cluster_name or "jwt-cache-cluster",
+        serv_list               = serv_list,
+        dict_name               = conf.redis_cluster_lock_dict or "kong_locks",
+        refresh_lock_key        = conf.redis_cluster_refresh_lock_key or "redis_cluster_slots_refresh_lock",
+        keepalive_timeout       = conf.redis_keepalive_idle_timeout or 60000,
+        keepalive_cons          = conf.redis_keepalive_pool_size or 100,
+        connect_timeout         = conf.redis_timeout or 2000,
+        read_timeout            = conf.redis_timeout or 2000,
+        send_timeout            = conf.redis_timeout or 2000,
+        lock_timeout            = conf.redis_cluster_lock_timeout or 5,
+        max_redirection         = conf.redis_cluster_max_redirection or 5,
+        max_connection_attempts = conf.redis_cluster_max_connection_attempts or 1,
+
+        -- auth (ACL ou requirepass)
+        auth                    = (conf.redis_password and conf.redis_password ~= "") and conf.redis_password or nil,
+        auth_user               = (conf.redis_username and conf.redis_username ~= "") and conf.redis_username or nil,
+
+        -- TLS (a lib repassa pro lua-resty-redis)
+        connect_opts            = {
+            ssl         = conf.redis_ssl and true or false,
+            ssl_verify  = conf.redis_ssl_verify and true or false,
+            server_name = conf.redis_server_name,
+        },
+    }
+
+    local red, err = rediscluster:new(params)
+    if not red then
+        return nil, "falha ao criar cliente cluster: " .. (err or "desconhecido")
+    end
+    return red
+end
 
 local function is_present(x) return x and x ~= "" end
 
@@ -85,6 +144,20 @@ end
 
 -- grava string crua com TTL (EX)
 function _M.store_raw(conf, key, value, ttl)
+    if conf.redis_cluster then
+        local red, err = red_connect_cluster(conf)
+        if not red then return nil, err end
+
+        local ok, e = red:set(key, value)
+        if not ok then return nil, e end
+        if ttl and ttl > 0 then
+            local ok2, e2 = red:expire(key, ttl)
+            if not ok2 then return nil, e2 end
+        end
+        return true
+    end
+
+
     if type(key) ~= "string" then
         return nil, "key must be a string"
     end
@@ -113,6 +186,15 @@ end
 
 -- opcional: leitura crua
 function _M.fetch_raw(conf, key)
+    if conf.redis_cluster then
+        local red, err = red_connect_cluster(conf)
+        if not red then return nil, err end
+        local val, e = red:get(key)
+        if e then return nil, e end
+        if val == ngx.null then return nil end
+        return val
+    end
+
     local red, errc = red_connect(conf)
     if not red then
         return nil, errc
